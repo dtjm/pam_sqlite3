@@ -1,58 +1,59 @@
 pam_sqlite3 v1.0.1
 ==================
 
+
 Introduction
 ============
 
-This module provides support to authenticate against SQLite
-tables for PAM-enabled appliations.
+This module provides support to authenticate against SQLite tables for PAM-enabled appliations.
 
-This module is based on pam_sqlite, which is based on the pam_pgsql
-module.
+This module is based on pam_sqlite, which is based on the pam_pgsql module.
+
+Note, though, you'll probably need to use some NSS library linked to the SQlite database (like https://github.com/agamez/libnss-sqlite3) for completeness
+
 
 Compilation & Installation
 ==========================
 
-pam_sqlite3 is autoconf'ed, thus, compiling should be a matter of:
+1.You will need to have SQLite and PAM library and header files for this module to compile. 
+In practice, in Ubuntu this means having "libsqlite3-dev" and "libpam0g-dev" packages installed and, in Fedora, having "sqlite-devel" and "pam-devel" ones (besides "sqlite" one, of course)
+
+
+2.pam_sqlite3 is autoconf'ed, thus, compiling should be a matter of:
 
     $ ./configure
     $ make
     $ make install
 
 Compilation has been tested on:
-- CentOS 5.1
+- Ubuntu 18.04
+- Fedora 29
 - CentOS 5.4
 - Mac OS X 10.6.4
 
-You will need to have SQLite and PAM library and header files for this
-module to compile.
 
-See test.c for an example application that authenticates using
-this module.
+3.See test.c for an example application that authenticates using this module. You can also use the pamtester utility found here: http://pamtester.sourceforge.net
 
-You can also use the pamtester utility found here:
-http://pamtester.sourceforge.net/
 
 Known Issues
 ============
 - No multi-type character support
 
+
 Configuration
 =============
 
-For the service you wish the module to be used, you need
-to edit the /etc/pam.d/<service> file or /etc/pam.conf, and 
-add the relevant lines.
-
-For example:
+1.-For the service you wish the module to be used, you need to edit the /etc/pam.d/<service> file (or /etc/pam.d/common-{auth,account,password} files in Ubuntu/Debian or /etc/pam.d/systemd-auth in Fedora), and add the relevant lines. For example:
 
 auth        required    pam_sqlite3.so 
 account     required    pam_sqlite3.so
 password    required    pam_sqlite3.so
 
-Configure the database, and table the module should use with
-the configuration file /etc/pam_sqlite3.conf. An example of
-this file:
+*Tip: Comment any default "pam_unix.so" line if you want pam_slite3 to be the only PAM method to be used.
+*Tip: Put "auth sufficient pam_sqlite3.so" instead of "auth required pam_sqlite3.so" before existing any default "pam_unix.so" line if you want to combine both PAM methods, one after another
+
+
+2.-Configure the database, and table the module should use with the configuration file /etc/pam_sqlite3.conf. An example of this file:
 
 database = /etc/sysdb
 table = account
@@ -62,15 +63,14 @@ expired_column = acc_expired
 newtok_column = acc_new_pwreq
 debug
 
-expired_column tells PAM if the user account has expired. Set it to '1'
-or 'y' if it has.
+(you should read the "Configuration Options" section in this README to know the meaning of each one).
 
-newtok_column tells PAM if the user needs a new password. Set it to '1'
-or 'y' if it does.
 
-Note that for backwards compatibility with earlier versions, options specified
-in the configuration file can be supplied as module arguments as well. Module
-arguments will override the configuration file.
+3.-Once desired configuration is done, we will be already able to create the database schema. For example: 
+
+CREATE TABLE account (user_name TEXT PRIMARY KEY, user_password TEXT NOT NULL, acc_expired TEXT DEFAULT "0", acc_new_pwreq TEXT DEFAULT "0");
+INSERT INTO account (user_name, user_password) VALUES ("pepe","1234");
+
 
 Configuration Options
 =====================
@@ -79,30 +79,22 @@ Configuration Options
     table               - the name of the table to query
     user_column         - the column containing usernames
     pwd_column          - the column containing the passwords
-    expired_column      - this column should contain '1' or 'y' if the account
-                          has expired
-    newtok_column       - this column should contain '1' or 'y' if the user
-                          needs to change their password
-    debug               - this is a standard module option that will enable
-                          debug output to syslog (takes no values)
-    pw_type             - specifies the password encryption scheme, can be one
-                          of 'clear', 'md5', 'sha-256', 'sha-512' or 'crypt'.
-                          defaults to 'clear'.
-    config_file         - specifies the path to a file to read for further
-                          configuration options
-    sql_verify          - specifies SQL template to use when verifying the
-                          the password for a user; this query should select only
-                          the password field and does not need to be wrapped in 
-                          quotes                          
+    expired_column      - this column should contain '1' or 'y' if the account has expired
+    newtok_column       - this column should contain '1' or 'y' if the user needs to change their password
+    debug               - this is a standard module option that will enable debug output to syslog (takes no values)
+    pw_type             - specifies the password encryption scheme, can be one of 'clear', 'md5', 'sha-256', 'sha-512' or 'crypt'. Defaults to 'clear'.
+    config_file         - specifies the path to a file to read for further configuration options
+    sql_verify          - specifies SQL template to use when verifying the password for a user; this query should select only the password field and does not need to be wrapped in quotes                          
                           Default: SELECT %Op FROM %Ot WHERE %Ou='%U'
-    sql_check_expired   - SQL template to use when checking for account expiry.
+    sql_check_expired   - SQL template to use when checking for account expiry. 
                           Default: SELECT 1 from %Ot WHERE %Ou='%U' AND (%Ox='y' OR %Ox='1')
-    sql_check_newtok    - SQL template to use when checking to see if the user
-                          needs to change their password.
+    sql_check_newtok    - SQL template to use when checking to see if the user needs to change their password.
                           Default: SELECT 1 FROM %Ot WHERE %Ou='%U' AND (%On='y' OR %On='1')
-    sql_set_passwd      - SQL template to use when updating the password for
-                          and user.
+    sql_set_passwd      - SQL template to use when updating the password for and user.
                           Default: UPDATE %Ot SET %Op='%P' WHERE %Ou='%U'
+
+Note that for backwards compatibility with earlier versions, options specified in the configuration file can be supplied as module arguments as well. Module
+arguments will override the configuration file.
 
 
 SQL Templates
